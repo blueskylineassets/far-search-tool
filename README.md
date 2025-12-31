@@ -147,7 +147,7 @@ Returns a formatted string containing matching FAR clauses with:
 
 | Tier | Rate Limit | Price |
 |------|------------|-------|
-| Free | 100 requests/day | $0 |
+| Free | 500 requests/month | $0 |
 | Pro | 5,000 requests/month | $29/month |
 | Ultra | 150,000 requests/month | $199/month |
 
