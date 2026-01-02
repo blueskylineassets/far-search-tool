@@ -196,6 +196,8 @@
         .source-far-oracle { background: rgba(59, 130, 246, 0.2); color: #3b82f6; }
         .source-direct { background: rgba(255, 255, 255, 0.1); color: #888; }
 
+        .location-cell { font-size: 0.85rem; color: #ccc; }
+
         .status-active { color: #00ff88; }
         .status-trial { color: #ffc832; }
 
@@ -284,9 +286,9 @@
                         <tr>
                             <th>Agent/Company</th>
                             <th>Source</th>
+                            <th>Location</th>
                             <th>Plan</th>
                             <th>Usage</th>
-                            <th>Status</th>
                             <th>Registered</th>
                         </tr>
                     </thead>
@@ -469,11 +471,14 @@
                     const source = c.registration_source || 'direct';
                     const sourceClass = `source-${source.replace(/[^a-z-]/gi, '-')}`;
                     const planClass = `plan-${(c.plan || 'free').toLowerCase()}`;
-                    const statusClass = c.billing_status === 'active' ? 'status-active' : 'status-trial';
                     
                     const registered = new Date(c.created_at).toLocaleDateString();
                     const usage = c.queries_used_this_month || 0;
                     const limit = c.queries_per_month || 500;
+                    
+                    // Location display
+                    const flag = c.flag || '🌍';
+                    const location = c.location || 'Unknown';
                     
                     return `
                         <tr>
@@ -482,9 +487,9 @@
                                 <div class="customer-email">${escapeHtml(c.email || '')}</div>
                             </td>
                             <td><span class="source-badge ${sourceClass}">${source}</span></td>
+                            <td><span class="location-cell">${flag} ${escapeHtml(location)}</span></td>
                             <td><span class="plan-badge ${planClass}">${c.plan || 'free'}</span></td>
                             <td>${usage}/${limit}</td>
-                            <td class="${statusClass}">${c.billing_status || 'trial'}</td>
                             <td>${registered}</td>
                         </tr>
                     `;
