@@ -708,41 +708,32 @@
             }
         }
 
-        // Fetch PyPI download stats
+        // Fetch PyPI download stats (via backend proxy to avoid CORS)
         async function fetchPyPIStats() {
             try {
-                // far-search-tool
-                const searchResp = await fetch('https://pypistats.org/api/packages/far-search-tool/recent');
-                if (searchResp.ok) {
-                    const data = await searchResp.json();
-                    document.getElementById('farSearchWeek').textContent = data.data?.last_week || '--';
-                    const searchMonth = data.data?.last_month || 0;
-                    updateMonthlyTotal(searchMonth, 'search');
+                const response = await fetch(`${API_URL}/v1/pypi-stats`);
+                if (response.ok) {
+                    const data = await response.json();
+                    const pypi = data.pypi_downloads || {};
+                    
+                    // far-search-tool
+                    const searchData = pypi['far-search-tool'] || {};
+                    document.getElementById('farSearchWeek').textContent = searchData.week || 0;
+                    
+                    // far-oracle
+                    const oracleData = pypi['far-oracle'] || {};
+                    document.getElementById('farOracleWeek').textContent = oracleData.week || 0;
+                    
+                    // Total monthly
+                    document.getElementById('totalMonthly').textContent = data.total_monthly || 0;
+                    
+                    console.log('✅ PyPI stats loaded:', data);
+                } else {
+                    console.warn('PyPI stats endpoint returned:', response.status);
                 }
             } catch (e) {
-                console.warn('Failed to fetch far-search-tool stats:', e);
+                console.warn('Failed to fetch PyPI stats:', e);
             }
-            
-            try {
-                // far-oracle (with delay to avoid rate limiting)
-                await new Promise(r => setTimeout(r, 1000));
-                const oracleResp = await fetch('https://pypistats.org/api/packages/far-oracle/recent');
-                if (oracleResp.ok) {
-                    const data = await oracleResp.json();
-                    document.getElementById('farOracleWeek').textContent = data.data?.last_week || '--';
-                    const oracleMonth = data.data?.last_month || 0;
-                    updateMonthlyTotal(oracleMonth, 'oracle');
-                }
-            } catch (e) {
-                console.warn('Failed to fetch far-oracle stats:', e);
-            }
-        }
-        
-        let monthlyTotals = { search: 0, oracle: 0 };
-        function updateMonthlyTotal(value, type) {
-            monthlyTotals[type] = value;
-            const total = monthlyTotals.search + monthlyTotals.oracle;
-            document.getElementById('totalMonthly').textContent = total;
         }
         
         // Fetch registered FAR users
@@ -769,3 +760,5 @@
 </html>
 
 
+<!-- Deployed: Fri Jan  2 17:33:35 EST 2026 -->
+<!-- Force deploy: Fri Jan  2 17:50:51 EST 2026 -->
