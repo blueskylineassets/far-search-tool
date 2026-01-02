@@ -468,7 +468,15 @@
                     return;
                 }
                 
-                document.getElementById('customerTableBody').innerHTML = customers.map(c => {
+                // Sort by usage (highest first), then by created_at (newest first)
+                const sorted = [...customers].sort((a, b) => {
+                    const aUsage = a.queries_used_this_month || 0;
+                    const bUsage = b.queries_used_this_month || 0;
+                    if (bUsage !== aUsage) return bUsage - aUsage;
+                    return new Date(b.created_at) - new Date(a.created_at);
+                });
+                
+                document.getElementById('customerTableBody').innerHTML = sorted.map(c => {
                     const source = c.registration_source || 'direct';
                     const sourceClass = `source-${source.replace(/[^a-z-]/gi, '-')}`;
                     const planClass = `plan-${(c.plan || 'free').toLowerCase()}`;
