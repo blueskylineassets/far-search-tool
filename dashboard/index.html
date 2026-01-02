@@ -409,39 +409,40 @@
                 if (!response.ok) throw new Error('Customer count failed');
                 
                 const data = await response.json();
-                const bySource = data.by_source || {};
                 
-                // Calculate tiers (simplified - all are "trial" unless marked)
+                // Three-tier breakdown
+                const production = data.production || 0;
+                const trial = data.trial || 0;
+                const test = data.test || 0;
                 const total = data.count || 0;
-                const farSearchTool = bySource['far-search-tool'] || 0;
-                const farOracle = bySource['far-oracle'] || 0;
-                const direct = bySource['direct'] || 0;
+                const realCustomers = production + trial;  // Exclude test accounts
                 
                 document.getElementById('customerMetrics').innerHTML = `
                     <div class="stat-card highlight">
-                        <div class="stat-label">🚀 Total Registered</div>
-                        <div class="stat-value">${total}</div>
-                        <div class="stat-detail">All FAR API users</div>
+                        <div class="stat-label">🚀 Production</div>
+                        <div class="stat-value" style="color: #00ff88;">${production}</div>
+                        <div class="stat-detail">Cloud/server deployments</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">📦 far-search-tool</div>
-                        <div class="stat-value" style="color: #64b4ff;">${farSearchTool}</div>
-                        <div class="stat-detail">LangChain users</div>
+                        <div class="stat-label">🧪 Trial</div>
+                        <div class="stat-value" style="color: #64b4ff;">${trial}</div>
+                        <div class="stat-detail">Developers evaluating</div>
+                    </div>
+                    <div class="stat-card" style="opacity: 0.5;">
+                        <div class="stat-label">🔧 Test</div>
+                        <div class="stat-value" style="color: #888;">${test}</div>
+                        <div class="stat-detail">Hidden from metrics</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">🔮 far-oracle</div>
-                        <div class="stat-value" style="color: #3b82f6;">${farOracle}</div>
-                        <div class="stat-detail">MCP Server users</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">🔗 Direct API</div>
-                        <div class="stat-value" style="color: #888;">${direct}</div>
-                        <div class="stat-detail">Direct registrations</div>
+                        <div class="stat-label">📊 Real Customers</div>
+                        <div class="stat-value">${realCustomers}</div>
+                        <div class="stat-detail">Production + Trial</div>
                     </div>
                 `;
                 
-                // Store for funnel
-                window.totalCustomers = total;
+                // Store for funnel (exclude test)
+                window.totalCustomers = realCustomers;
+                window.productionCustomers = production;
                 
             } catch (e) {
                 console.error('Customer metrics error:', e);
@@ -471,6 +472,8 @@
                     const source = c.registration_source || 'direct';
                     const sourceClass = `source-${source.replace(/[^a-z-]/gi, '-')}`;
                     const planClass = `plan-${(c.plan || 'free').toLowerCase()}`;
+                    const accountType = c.account_type || 'trial';
+                    const opacity = accountType === 'test' ? '0.5' : '1';
                     
                     const registered = new Date(c.created_at).toLocaleDateString();
                     const usage = c.queries_used_this_month || 0;
@@ -480,10 +483,17 @@
                     const flag = c.flag || '🌍';
                     const location = c.location || 'Unknown';
                     
+                    // Account type badge
+                    const accountBadge = accountType === 'production' 
+                        ? '<span style="background:rgba(0,255,136,0.2);color:#00ff88;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🚀 Prod</span>'
+                        : accountType === 'trial'
+                        ? '<span style="background:rgba(100,180,255,0.2);color:#64b4ff;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🧪 Trial</span>'
+                        : '<span style="background:rgba(100,100,100,0.2);color:#666;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🔧 Test</span>';
+                    
                     return `
-                        <tr>
+                        <tr style="opacity: ${opacity};">
                             <td>
-                                <div class="customer-name">${escapeHtml(c.agent_id || c.company_name || 'Unknown')}</div>
+                                <div class="customer-name">${escapeHtml(c.agent_id || c.company_name || 'Unknown')}${accountBadge}</div>
                                 <div class="customer-email">${escapeHtml(c.email || '')}</div>
                             </td>
                             <td><span class="source-badge ${sourceClass}">${source}</span></td>
