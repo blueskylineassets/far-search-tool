@@ -449,7 +449,12 @@
         async function loadCustomers() {
             try {
                 const response = await fetch(`${API_URL}/v1/customers/list`);
-                if (!response.ok) throw new Error('Customer list failed');
+                if (!response.ok) {
+                    // Endpoint not available yet - show placeholder
+                    document.getElementById('customerTableBody').innerHTML = 
+                        '<tr><td colspan="6" style="text-align: center; color: #888;">📊 Customer details endpoint deploying...</td></tr>';
+                    return;
+                }
                 
                 const data = await response.json();
                 const customers = data.customers || [];
@@ -486,16 +491,37 @@
                 }).join('');
                 
             } catch (e) {
-                console.error('Customer list error:', e);
+                console.warn('Customer list not available yet:', e.message);
                 document.getElementById('customerTableBody').innerHTML = 
-                    '<tr><td colspan="6" style="text-align: center; color: #ff6464;">Failed to load customers</td></tr>';
+                    '<tr><td colspan="6" style="text-align: center; color: #888;">📊 Customer details coming soon...</td></tr>';
             }
         }
 
         async function loadApiUsage() {
             try {
                 const response = await fetch(`${API_URL}/v1/usage/stats`);
-                if (!response.ok) throw new Error('Usage stats failed');
+                if (!response.ok) {
+                    // Endpoint not deployed yet - show placeholder with customer count
+                    const customers = window.totalCustomers || 0;
+                    document.getElementById('apiUsage').innerHTML = `
+                        <div class="stat-card highlight">
+                            <div class="stat-label">Registered Users</div>
+                            <div class="stat-value">${customers}</div>
+                            <div class="stat-detail">Active API keys</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Queries Today</div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-detail">Stats deploying...</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Total Queries</div>
+                            <div class="stat-value">--</div>
+                            <div class="stat-detail">Coming soon</div>
+                        </div>
+                    `;
+                    return;
+                }
                 
                 const data = await response.json();
                 
@@ -522,12 +548,13 @@
                 window.totalQueries = data.total_queries || 0;
                 
             } catch (e) {
-                console.error('Usage stats error:', e);
+                console.warn('Usage stats not available yet:', e.message);
+                const customers = window.totalCustomers || 0;
                 document.getElementById('apiUsage').innerHTML = `
-                    <div class="stat-card">
-                        <div class="stat-label">API Usage</div>
-                        <div class="stat-value">--</div>
-                        <div class="stat-detail">Endpoint not available</div>
+                    <div class="stat-card highlight">
+                        <div class="stat-label">Registered Users</div>
+                        <div class="stat-value">${customers}</div>
+                        <div class="stat-detail">From /v1/customers/count</div>
                     </div>
                 `;
             }
