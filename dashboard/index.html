@@ -444,11 +444,11 @@
                 downloadChart.destroy();
             }
             
-            // Create bar chart showing daily, weekly, monthly downloads for each package
+            // Create line chart showing daily, weekly, monthly downloads for each package
             const labels = ['Today', 'This Week', 'This Month'];
             
             downloadChart = new Chart(ctx, {
-                type: 'bar',
+                type: 'line',
                 data: {
                     labels: labels,
                     datasets: [
@@ -459,9 +459,16 @@
                                 searchData.week || 0,
                                 searchData.month || 0
                             ],
-                            backgroundColor: 'rgba(100, 180, 255, 0.7)',
                             borderColor: 'rgba(100, 180, 255, 1)',
-                            borderWidth: 1
+                            backgroundColor: 'rgba(100, 180, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointBackgroundColor: 'rgba(100, 180, 255, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 7
                         },
                         {
                             label: 'far-oracle',
@@ -470,21 +477,34 @@
                                 oracleData.week || 0,
                                 oracleData.month || 0
                             ],
-                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
                             borderColor: 'rgba(59, 130, 246, 1)',
-                            borderWidth: 1
+                            backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.3,
+                            pointRadius: 5,
+                            pointBackgroundColor: 'rgba(59, 130, 246, 1)',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            pointHoverRadius: 7
                         }
                     ]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
+                    },
                     plugins: {
                         legend: {
                             position: 'top',
                             labels: {
                                 color: '#888',
-                                font: { size: 11 }
+                                font: { size: 11 },
+                                usePointStyle: true,
+                                pointStyle: 'circle'
                             }
                         },
                         tooltip: {
