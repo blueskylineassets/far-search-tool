@@ -159,6 +159,35 @@
             border-bottom: 1px solid rgba(100, 180, 255, 0.2);
         }
 
+        .customer-table th.sortable {
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+        }
+
+        .customer-table th.sortable:hover {
+            color: #64b4ff;
+            background: rgba(100, 180, 255, 0.1);
+        }
+
+        .customer-table th.sortable::after {
+            content: ' ↕';
+            opacity: 0.3;
+            font-size: 0.8em;
+        }
+
+        .customer-table th.sortable.sort-asc::after {
+            content: ' ↑';
+            opacity: 1;
+            color: #64b4ff;
+        }
+
+        .customer-table th.sortable.sort-desc::after {
+            content: ' ↓';
+            opacity: 1;
+            color: #64b4ff;
+        }
+
         .customer-table td {
             padding: 12px 15px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
@@ -281,15 +310,15 @@
         <section>
             <h3 class="section-title">📋 Customer Details</h3>
             <div class="customer-table-container">
-                <table class="customer-table">
+                <table class="customer-table" id="customerTable">
                     <thead>
                         <tr>
                             <th>Agent/Company</th>
                             <th>Source</th>
                             <th>Location</th>
                             <th>Plan</th>
-                            <th>Usage</th>
-                            <th>Registered</th>
+                            <th class="sortable sort-desc" data-sort="usage" onclick="sortCustomers('usage')">Usage</th>
+                            <th class="sortable" data-sort="date" onclick="sortCustomers('date')">Registered</th>
                         </tr>
                     </thead>
                     <tbody id="customerTableBody">
@@ -449,69 +478,115 @@
             }
         }
 
+        // Global state for customer sorting
+        let customerData = [];
+        let customerSortColumn = 'usage';
+        let customerSortDirection = 'desc';
+
+        function sortCustomers(column) {
+            // Toggle direction if same column, otherwise default to desc
+            if (customerSortColumn === column) {
+                customerSortDirection = customerSortDirection === 'desc' ? 'asc' : 'desc';
+            } else {
+                customerSortColumn = column;
+                customerSortDirection = 'desc';
+            }
+            
+            // Update header classes
+            document.querySelectorAll('.customer-table th.sortable').forEach(th => {
+                th.classList.remove('sort-asc', 'sort-desc');
+                if (th.dataset.sort === column) {
+                    th.classList.add(customerSortDirection === 'asc' ? 'sort-asc' : 'sort-desc');
+                }
+            });
+            
+            // Re-render with new sort
+            renderCustomerTable();
+        }
+
+        function renderCustomerTable() {
+            const tbody = document.getElementById('customerTableBody');
+            
+            if (!customerData || customerData.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; color: #666;">No customers yet</td></tr>';
+                return;
+            }
+            
+            // Sort based on current settings
+            const sorted = [...customerData].sort((a, b) => {
+                let comparison = 0;
+                
+                if (customerSortColumn === 'usage') {
+                    const aUsage = a.queries_used_this_month || 0;
+                    const bUsage = b.queries_used_this_month || 0;
+                    comparison = bUsage - aUsage;
+                } else if (customerSortColumn === 'date') {
+                    comparison = new Date(b.created_at) - new Date(a.created_at);
+                }
+                
+                // Secondary sort
+                if (comparison === 0) {
+                    if (customerSortColumn === 'usage') {
+                        comparison = new Date(b.created_at) - new Date(a.created_at);
+                    } else {
+                        comparison = (b.queries_used_this_month || 0) - (a.queries_used_this_month || 0);
+                    }
+                }
+                
+                return customerSortDirection === 'asc' ? -comparison : comparison;
+            });
+            
+            tbody.innerHTML = sorted.map(c => {
+                const source = c.registration_source || 'direct';
+                const sourceClass = `source-${source.replace(/[^a-z-]/gi, '-')}`;
+                const planClass = `plan-${(c.plan || 'free').toLowerCase()}`;
+                const accountType = c.account_type || 'trial';
+                const opacity = accountType === 'test' ? '0.5' : '1';
+                
+                const registered = new Date(c.created_at).toLocaleDateString();
+                const usage = c.queries_used_this_month || 0;
+                const limit = c.queries_per_month || 500;
+                
+                // Location display
+                const flag = c.flag || '🌍';
+                const location = c.location || 'Unknown';
+                
+                // Account type badge
+                const accountBadge = accountType === 'production' 
+                    ? '<span style="background:rgba(0,255,136,0.2);color:#00ff88;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🚀 Prod</span>'
+                    : accountType === 'trial'
+                    ? '<span style="background:rgba(100,180,255,0.2);color:#64b4ff;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🧪 Trial</span>'
+                    : '<span style="background:rgba(100,100,100,0.2);color:#666;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🔧 Test</span>';
+                
+                return `
+                    <tr style="opacity: ${opacity};">
+                        <td>
+                            <div class="customer-name">${escapeHtml(c.agent_id || c.company_name || 'Unknown')}${accountBadge}</div>
+                            <div class="customer-email">${escapeHtml(c.email || '')}</div>
+                        </td>
+                        <td><span class="source-badge ${sourceClass}">${source}</span></td>
+                        <td><span class="location-cell">${flag} ${escapeHtml(location)}</span></td>
+                        <td><span class="plan-badge ${planClass}">${c.plan || 'free'}</span></td>
+                        <td>${usage}/${limit}</td>
+                        <td>${registered}</td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         async function loadCustomers() {
             try {
                 const response = await fetch(`${API_URL}/v1/customers/list`);
                 if (!response.ok) {
-                    // Endpoint not available yet - show placeholder
                     document.getElementById('customerTableBody').innerHTML = 
                         '<tr><td colspan="6" style="text-align: center; color: #888;">📊 Customer details endpoint deploying...</td></tr>';
                     return;
                 }
                 
                 const data = await response.json();
-                const customers = data.customers || [];
+                customerData = data.customers || [];
                 
-                if (customers.length === 0) {
-                    document.getElementById('customerTableBody').innerHTML = 
-                        '<tr><td colspan="6" style="text-align: center; color: #666;">No customers yet</td></tr>';
-                    return;
-                }
-                
-                // Sort by usage (highest first), then by created_at (newest first)
-                const sorted = [...customers].sort((a, b) => {
-                    const aUsage = a.queries_used_this_month || 0;
-                    const bUsage = b.queries_used_this_month || 0;
-                    if (bUsage !== aUsage) return bUsage - aUsage;
-                    return new Date(b.created_at) - new Date(a.created_at);
-                });
-                
-                document.getElementById('customerTableBody').innerHTML = sorted.map(c => {
-                    const source = c.registration_source || 'direct';
-                    const sourceClass = `source-${source.replace(/[^a-z-]/gi, '-')}`;
-                    const planClass = `plan-${(c.plan || 'free').toLowerCase()}`;
-                    const accountType = c.account_type || 'trial';
-                    const opacity = accountType === 'test' ? '0.5' : '1';
-                    
-                    const registered = new Date(c.created_at).toLocaleDateString();
-                    const usage = c.queries_used_this_month || 0;
-                    const limit = c.queries_per_month || 500;
-                    
-                    // Location display
-                    const flag = c.flag || '🌍';
-                    const location = c.location || 'Unknown';
-                    
-                    // Account type badge
-                    const accountBadge = accountType === 'production' 
-                        ? '<span style="background:rgba(0,255,136,0.2);color:#00ff88;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🚀 Prod</span>'
-                        : accountType === 'trial'
-                        ? '<span style="background:rgba(100,180,255,0.2);color:#64b4ff;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🧪 Trial</span>'
-                        : '<span style="background:rgba(100,100,100,0.2);color:#666;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🔧 Test</span>';
-                    
-                    return `
-                        <tr style="opacity: ${opacity};">
-                            <td>
-                                <div class="customer-name">${escapeHtml(c.agent_id || c.company_name || 'Unknown')}${accountBadge}</div>
-                                <div class="customer-email">${escapeHtml(c.email || '')}</div>
-                            </td>
-                            <td><span class="source-badge ${sourceClass}">${source}</span></td>
-                            <td><span class="location-cell">${flag} ${escapeHtml(location)}</span></td>
-                            <td><span class="plan-badge ${planClass}">${c.plan || 'free'}</span></td>
-                            <td>${usage}/${limit}</td>
-                            <td>${registered}</td>
-                        </tr>
-                    `;
-                }).join('');
+                renderCustomerTable();
                 
             } catch (e) {
                 console.warn('Customer list not available yet:', e.message);
