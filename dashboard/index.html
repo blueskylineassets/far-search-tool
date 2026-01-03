@@ -425,8 +425,8 @@
                 // Update conversion funnel with download data
                 updateConversionFunnel(data.total_monthly || 0);
                 
-                // Render the download trends chart
-                renderDownloadChart(searchData, oracleData);
+                // Load daily data for the trends chart (separate call)
+                loadDailyDownloads();
                 
             } catch (e) {
                 console.error('PyPI stats error:', e);
@@ -435,7 +435,24 @@
             }
         }
 
-        function renderDownloadChart(searchData, oracleData) {
+        async function loadDailyDownloads() {
+            try {
+                const response = await fetch(`${API_URL}/v1/pypi-stats/daily`);
+                if (!response.ok) throw new Error('Daily stats failed');
+                
+                const data = await response.json();
+                renderDownloadChart(data);
+            } catch (e) {
+                console.error('Failed to load daily downloads:', e);
+                // Show placeholder message in chart area
+                const ctx = document.getElementById('downloadChart');
+                if (ctx) {
+                    ctx.parentElement.innerHTML = '<div style="text-align:center;color:#666;padding:40px;">Daily download data loading...</div>';
+                }
+            }
+        }
+
+        function renderDownloadChart(dailyData) {
             const ctx = document.getElementById('downloadChart');
             if (!ctx) return;
             
@@ -444,8 +461,10 @@
                 downloadChart.destroy();
             }
             
-            // Create line chart showing daily, weekly, monthly downloads for each package
-            const labels = ['Today', 'This Week', 'This Month'];
+            // Use actual daily data for the last 7 days
+            const labels = dailyData.labels || [];
+            const searchToolData = dailyData.packages?.['far-search-tool'] || [];
+            const oracleData = dailyData.packages?.['far-oracle'] || [];
             
             downloadChart = new Chart(ctx, {
                 type: 'line',
@@ -454,39 +473,31 @@
                     datasets: [
                         {
                             label: 'far-search-tool',
-                            data: [
-                                searchData.day || 0,
-                                searchData.week || 0,
-                                searchData.month || 0
-                            ],
+                            data: searchToolData,
                             borderColor: 'rgba(100, 180, 255, 1)',
                             backgroundColor: 'rgba(100, 180, 255, 0.1)',
                             borderWidth: 2,
                             fill: true,
                             tension: 0.3,
-                            pointRadius: 5,
+                            pointRadius: 4,
                             pointBackgroundColor: 'rgba(100, 180, 255, 1)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
-                            pointHoverRadius: 7
+                            pointHoverRadius: 6
                         },
                         {
                             label: 'far-oracle',
-                            data: [
-                                oracleData.day || 0,
-                                oracleData.week || 0,
-                                oracleData.month || 0
-                            ],
+                            data: oracleData,
                             borderColor: 'rgba(59, 130, 246, 1)',
                             backgroundColor: 'rgba(59, 130, 246, 0.1)',
                             borderWidth: 2,
                             fill: true,
                             tension: 0.3,
-                            pointRadius: 5,
+                            pointRadius: 4,
                             pointBackgroundColor: 'rgba(59, 130, 246, 1)',
                             pointBorderColor: '#fff',
                             pointBorderWidth: 2,
-                            pointHoverRadius: 7
+                            pointHoverRadius: 6
                         }
                     ]
                 },
@@ -510,7 +521,12 @@
                         tooltip: {
                             backgroundColor: 'rgba(0, 0, 0, 0.8)',
                             titleColor: '#64b4ff',
-                            bodyColor: '#e0e0e0'
+                            bodyColor: '#e0e0e0',
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: ${context.parsed.y.toLocaleString()} downloads`;
+                                }
+                            }
                         }
                     },
                     scales: {
@@ -520,7 +536,12 @@
                         },
                         y: {
                             beginAtZero: true,
-                            ticks: { color: '#666' },
+                            ticks: { 
+                                color: '#666',
+                                callback: function(value) {
+                                    return value.toLocaleString();
+                                }
+                            },
                             grid: { color: 'rgba(255, 255, 255, 0.05)' }
                         }
                     }
