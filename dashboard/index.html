@@ -425,11 +425,87 @@
                 // Update conversion funnel with download data
                 updateConversionFunnel(data.total_monthly || 0);
                 
+                // Render the download trends chart
+                renderDownloadChart(searchData, oracleData);
+                
             } catch (e) {
                 console.error('PyPI stats error:', e);
                 document.getElementById('pypiDownloads').innerHTML = 
                     '<div class="stat-card"><div class="stat-value">--</div><div class="stat-detail">Failed to load</div></div>';
             }
+        }
+
+        function renderDownloadChart(searchData, oracleData) {
+            const ctx = document.getElementById('downloadChart');
+            if (!ctx) return;
+            
+            // Destroy existing chart if any
+            if (downloadChart) {
+                downloadChart.destroy();
+            }
+            
+            // Create bar chart showing daily, weekly, monthly downloads for each package
+            const labels = ['Today', 'This Week', 'This Month'];
+            
+            downloadChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'far-search-tool',
+                            data: [
+                                searchData.day || 0,
+                                searchData.week || 0,
+                                searchData.month || 0
+                            ],
+                            backgroundColor: 'rgba(100, 180, 255, 0.7)',
+                            borderColor: 'rgba(100, 180, 255, 1)',
+                            borderWidth: 1
+                        },
+                        {
+                            label: 'far-oracle',
+                            data: [
+                                oracleData.day || 0,
+                                oracleData.week || 0,
+                                oracleData.month || 0
+                            ],
+                            backgroundColor: 'rgba(59, 130, 246, 0.7)',
+                            borderColor: 'rgba(59, 130, 246, 1)',
+                            borderWidth: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                color: '#888',
+                                font: { size: 11 }
+                            }
+                        },
+                        tooltip: {
+                            backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                            titleColor: '#64b4ff',
+                            bodyColor: '#e0e0e0'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: { color: '#666' },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        },
+                        y: {
+                            beginAtZero: true,
+                            ticks: { color: '#666' },
+                            grid: { color: 'rgba(255, 255, 255, 0.05)' }
+                        }
+                    }
+                }
+            });
         }
 
         async function loadCustomerMetrics() {
