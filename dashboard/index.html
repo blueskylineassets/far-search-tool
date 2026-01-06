@@ -279,17 +279,55 @@
             </div>
         </header>
 
-        <!-- PyPI Downloads -->
+        <!-- SDK Activation Funnel -->
         <section>
-            <h2 class="section-title">📦 PyPI Downloads — Public Install Count</h2>
+            <h2 class="section-title">📊 FAR SDK Activation Funnel</h2>
+            <div class="stats-grid" id="sdkFunnel">
+                <div class="stat-card">
+                    <div class="stat-label">PyPI Downloads/Month</div>
+                    <div class="stat-value" id="totalDownloads">0</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">SDK Registrations</div>
+                    <div class="stat-value" id="sdkRegistrations">0</div>
+                    <div class="stat-detail" id="regConversion">0% from PyPI</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Active Users</div>
+                    <div class="stat-value" id="activeUsers">0</div>
+                    <div class="stat-detail" id="activeConversion">0% activation</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-label">Queries This Month</div>
+                    <div class="stat-value" id="queriesMonth">0</div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAR Package Downloads -->
+        <section>
+            <h2 class="section-title">📦 FAR Package Downloads (Monthly)</h2>
             <p class="section-description">
                 ⚠️ <strong>What this means:</strong> Anyone who ran <code>pip install</code>.
                 Includes CI/CD bots, mirrors, and people testing locally.
                 <strong>Does NOT require registration.</strong>
             </p>
-            <div class="stats-grid" id="pypiDownloads">
+            <div id="packageDownloads" style="display: flex; flex-wrap: wrap; gap: 15px;">
                 <div class="loading">Loading PyPI data...</div>
             </div>
+        </section>
+
+        <!-- Registration Sources -->
+        <section>
+            <h2 class="section-title">📈 Registration Sources</h2>
+            <div id="regSourcesList" style="display: flex; flex-wrap: wrap; gap: 15px;">
+                <div class="loading">Loading registration data...</div>
+            </div>
+        </section>
+
+        <!-- PyPI Downloads (Legacy - for chart) -->
+        <section style="display: none;">
+            <div class="stats-grid" id="pypiDownloads"></div>
         </section>
 
         <!-- Registered Customers -->
@@ -395,43 +433,80 @@
 
         async function loadPyPIStats() {
             try {
-                const response = await fetch(`${API_URL}/v1/pypi-stats`);
-                if (!response.ok) throw new Error('PyPI stats failed');
+                // Fetch funnel metrics (includes PyPI, registrations, active users)
+                const funnelResponse = await fetch(`${API_URL}/v1/funnel-metrics`);
+                if (!funnelResponse.ok) throw new Error('Funnel metrics failed');
                 
-                const data = await response.json();
-                const pypi = data.pypi_downloads || {};
+                const data = await funnelResponse.json();
                 
-                const searchData = pypi['far-search-tool'] || {};
-                const oracleData = pypi['far-oracle'] || {};
+                // Update SDK Activation Funnel stats
+                document.getElementById('totalDownloads').textContent = 
+                    (data.pypi_downloads?.monthly || 0).toLocaleString();
+                document.getElementById('sdkRegistrations').textContent = 
+                    (data.registrations?.total || 0).toLocaleString();
+                document.getElementById('activeUsers').textContent = 
+                    (data.active_users?.total || 0).toLocaleString();
+                document.getElementById('queriesMonth').textContent = 
+                    (data.queries?.this_month || 0).toLocaleString();
                 
-                document.getElementById('pypiDownloads').innerHTML = `
-                    <div class="stat-card highlight">
-                        <div class="stat-label">far-search-tool (PyPI)</div>
-                        <div class="stat-value">${searchData.week || 0}</div>
-                        <div class="stat-detail">${searchData.month || 0}/month · LangChain Tool</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">far-oracle (PyPI)</div>
-                        <div class="stat-value">${oracleData.week || 0}</div>
-                        <div class="stat-detail">${oracleData.month || 0}/month · MCP Server</div>
-                    </div>
-                    <div class="stat-card">
-                        <div class="stat-label">Total Monthly</div>
-                        <div class="stat-value">${data.total_monthly || 0}</div>
-                        <div class="stat-detail">All FAR packages</div>
-                    </div>
-                `;
+                // Update conversion rates
+                document.getElementById('regConversion').textContent = 
+                    `${data.conversions?.pypi_to_register || 0}% from PyPI`;
+                document.getElementById('activeConversion').textContent = 
+                    `${data.conversions?.register_to_active || 0}% activation`;
                 
-                // Update conversion funnel with download data
-                updateConversionFunnel(data.total_monthly || 0);
+                // Update FAR Package Downloads breakdown
+                const packagesList = document.getElementById('packageDownloads');
+                const packages = data.pypi_downloads?.packages || {};
+                const packageLabels = {
+                    'far-search-tool': '🔗 FAR Search Tool',
+                    'far-oracle': '🖥️ FAR Oracle (MCP)',
+                    'far-search': '📦 FAR Search Core',
+                    'far-search-autogpt': '🤖 FAR AutoGPT',
+                    'far-search-crewai': '👥 FAR CrewAI'
+                };
+                if (Object.keys(packages).length > 0) {
+                    packagesList.innerHTML = Object.entries(packages)
+                        .sort((a, b) => (b[1]?.month || 0) - (a[1]?.month || 0))
+                        .map(([pkg, stats]) => `
+                            <div style="background: rgba(100,180,255,0.1); border: 1px solid rgba(100,180,255,0.3); 
+                                        padding: 10px 15px; border-radius: 6px; min-width: 120px;">
+                                <div style="color: #64b4ff; font-weight: bold; font-size: 1.5rem;">
+                                    ${(stats?.month || 0).toLocaleString()}
+                                </div>
+                                <div style="color: #888; font-size: 0.8rem; margin-top: 4px;">
+                                    ${packageLabels[pkg] || pkg}
+                                </div>
+                            </div>
+                        `).join('');
+                } else {
+                    packagesList.innerHTML = '<span style="color: #666;">No download data</span>';
+                }
                 
-                // Load daily data for the trends chart (separate call)
+                // Update Registration Sources
+                const sourcesList = document.getElementById('regSourcesList');
+                const sources = data.registrations?.by_source || {};
+                if (Object.keys(sources).length > 0) {
+                    sourcesList.innerHTML = Object.entries(sources)
+                        .sort((a, b) => b[1] - a[1])
+                        .map(([source, count]) => `
+                            <div style="background: rgba(100,180,255,0.1); border: 1px solid rgba(100,180,255,0.3); 
+                                        padding: 10px 15px; border-radius: 6px;">
+                                <span style="color: #64b4ff; font-weight: bold;">${count}</span>
+                                <span style="color: #888; margin-left: 8px;">${source || 'direct'}</span>
+                            </div>
+                        `).join('');
+                } else {
+                    sourcesList.innerHTML = '<span style="color: #666;">No registrations yet</span>';
+                }
+                
+                // Load daily data for the trends chart
                 loadDailyDownloads();
                 
             } catch (e) {
-                console.error('PyPI stats error:', e);
-                document.getElementById('pypiDownloads').innerHTML = 
-                    '<div class="stat-card"><div class="stat-value">--</div><div class="stat-detail">Failed to load</div></div>';
+                console.error('PyPI/Funnel stats error:', e);
+                document.getElementById('packageDownloads').innerHTML = 
+                    '<span style="color: #666;">Failed to load package data</span>';
             }
         }
 
