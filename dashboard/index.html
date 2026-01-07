@@ -332,11 +332,11 @@
 
         <!-- Registered Customers -->
         <section>
-            <h2 class="section-title">👥 Registered Customers — Three-Tier System</h2>
+            <h2 class="section-title">👥 Registered Customers — Active vs Registered</h2>
             <p class="section-description">
-                <strong>Three account types:</strong><br>
-                🚀 <strong>Production</strong> — Deployed on cloud/servers (your goal metric)<br>
-                🧪 <strong>Trial</strong> — Developers evaluating on laptops (your conversion funnel)<br>
+                <strong>Key metrics:</strong><br>
+                ✅ <strong>Active Users</strong> — Users who have made at least 1 API query (your goal metric)<br>
+                📝 <strong>Registered</strong> — Total API key holders<br>
                 🔧 <strong>Test</strong> — Your internal tests (hidden from metrics)
             </p>
             <div class="stats-grid" id="customerMetrics">
@@ -503,6 +503,9 @@
                 // Load daily data for the trends chart
                 loadDailyDownloads();
                 
+                // Update conversion funnel with download count
+                updateConversionFunnel(data.pypi_downloads?.monthly || 0);
+                
             } catch (e) {
                 console.error('PyPI/Funnel stats error:', e);
                 document.getElementById('packageDownloads').innerHTML = 
@@ -626,44 +629,53 @@
 
         async function loadCustomerMetrics() {
             try {
-                const response = await fetch(`${API_URL}/v1/customers/count`);
-                if (!response.ok) throw new Error('Customer count failed');
+                // Fetch both count and list to calculate active users
+                const [countResponse, listResponse] = await Promise.all([
+                    fetch(`${API_URL}/v1/customers/count`),
+                    fetch(`${API_URL}/v1/customers/list`)
+                ]);
                 
-                const data = await response.json();
+                if (!countResponse.ok) throw new Error('Customer count failed');
                 
-                // Three-tier breakdown
-                const production = data.production || 0;
-                const trial = data.trial || 0;
-                const test = data.test || 0;
-                const total = data.count || 0;
-                const realCustomers = production + trial;  // Exclude test accounts
+                const countData = await countResponse.json();
+                const test = countData.test || 0;
+                const total = countData.count || 0;
+                const registered = total - test;  // Exclude test accounts
+                
+                // Calculate active users from customer list
+                let activeUsers = 0;
+                if (listResponse.ok) {
+                    const listData = await listResponse.json();
+                    const customers = listData.customers || [];
+                    activeUsers = customers.filter(c => 
+                        c.account_type !== 'test' && 
+                        (c.queries_used_this_month || 0) > 0
+                    ).length;
+                }
+                
+                const activationRate = registered > 0 ? ((activeUsers / registered) * 100).toFixed(0) : 0;
                 
                 document.getElementById('customerMetrics').innerHTML = `
                     <div class="stat-card highlight">
-                        <div class="stat-label">🚀 Production</div>
-                        <div class="stat-value" style="color: #00ff88;">${production}</div>
-                        <div class="stat-detail">Cloud/server deployments</div>
+                        <div class="stat-label">✅ Active Users</div>
+                        <div class="stat-value" style="color: #00ff88;">${activeUsers}</div>
+                        <div class="stat-detail">Made at least 1 query</div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-label">🧪 Trial</div>
-                        <div class="stat-value" style="color: #64b4ff;">${trial}</div>
-                        <div class="stat-detail">Developers evaluating</div>
+                        <div class="stat-label">📝 Registered</div>
+                        <div class="stat-value" style="color: #64b4ff;">${registered}</div>
+                        <div class="stat-detail">${activationRate}% activation rate</div>
                     </div>
                     <div class="stat-card" style="opacity: 0.5;">
                         <div class="stat-label">🔧 Test</div>
                         <div class="stat-value" style="color: #888;">${test}</div>
                         <div class="stat-detail">Hidden from metrics</div>
                     </div>
-                    <div class="stat-card">
-                        <div class="stat-label">📊 Real Customers</div>
-                        <div class="stat-value">${realCustomers}</div>
-                        <div class="stat-detail">Production + Trial</div>
-                    </div>
                 `;
                 
                 // Store for funnel (exclude test)
-                window.totalCustomers = realCustomers;
-                window.productionCustomers = production;
+                window.totalCustomers = registered;
+                window.activeUsers = activeUsers;
                 
             } catch (e) {
                 console.error('Customer metrics error:', e);
@@ -743,12 +755,13 @@
                 const flag = c.flag || '🌍';
                 const location = c.location || 'Unknown';
                 
-                // Account type badge
-                const accountBadge = accountType === 'production' 
-                    ? '<span style="background:rgba(0,255,136,0.2);color:#00ff88;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🚀 Prod</span>'
-                    : accountType === 'trial'
-                    ? '<span style="background:rgba(100,180,255,0.2);color:#64b4ff;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🧪 Trial</span>'
-                    : '<span style="background:rgba(100,100,100,0.2);color:#666;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🔧 Test</span>';
+                // Activity badge based on usage
+                const isActive = usage > 0;
+                const accountBadge = accountType === 'test'
+                    ? '<span style="background:rgba(100,100,100,0.2);color:#666;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">🔧 Test</span>'
+                    : isActive
+                    ? '<span style="background:rgba(0,255,136,0.2);color:#00ff88;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">✅ Active</span>'
+                    : '<span style="background:rgba(100,180,255,0.2);color:#64b4ff;font-size:0.6rem;padding:2px 6px;border-radius:3px;margin-left:8px;">📝 Registered</span>';
                 
                 return `
                     <tr style="opacity: ${opacity};">
