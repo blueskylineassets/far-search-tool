@@ -423,6 +423,11 @@
                     loadApiUsage()
                 ]);
                 
+                // Update conversion funnel AFTER all data is loaded
+                // (depends on window.totalCustomers from loadCustomerMetrics 
+                // and window.pypiDownloads from loadPyPIStats)
+                updateConversionFunnel(window.pypiDownloads || 0);
+                
                 document.getElementById('lastUpdated').textContent = 
                     `Updated: ${new Date().toLocaleTimeString()}`;
             } catch (e) {
@@ -503,8 +508,8 @@
                 // Load daily data for the trends chart
                 loadDailyDownloads();
                 
-                // Update conversion funnel with download count
-                updateConversionFunnel(data.pypi_downloads?.monthly || 0);
+                // Store downloads for funnel (called after all data loads)
+                window.pypiDownloads = data.pypi_downloads?.monthly || 0;
                 
             } catch (e) {
                 console.error('PyPI/Funnel stats error:', e);
@@ -864,26 +869,26 @@
         }
 
         function updateConversionFunnel(downloads) {
-            const customers = window.totalCustomers || 0;
-            const queries = window.totalQueries || 0;
+            const registered = window.totalCustomers || 0;
+            const activeUsers = window.activeUsers || 0;
             
-            const regRate = downloads > 0 ? ((customers / downloads) * 100).toFixed(1) : 0;
-            const activeRate = customers > 0 ? ((queries > 0 ? customers : 0) / customers * 100).toFixed(0) : 0;
+            const regRate = downloads > 0 ? ((registered / downloads) * 100).toFixed(1) : 0;
+            const activeRate = registered > 0 ? ((activeUsers / registered) * 100).toFixed(0) : 0;
             
             document.getElementById('conversionFunnel').innerHTML = `
                 <div class="stat-card">
                     <div class="stat-label">📥 Downloads</div>
-                    <div class="stat-value">${downloads}</div>
+                    <div class="stat-value">${downloads.toLocaleString()}</div>
                     <div class="stat-detail">Monthly installs</div>
                 </div>
                 <div class="stat-card">
                     <div class="stat-label">📝 Registrations</div>
-                    <div class="stat-value">${customers}</div>
+                    <div class="stat-value">${registered}</div>
                     <div class="stat-detail">${regRate}% conversion</div>
                 </div>
                 <div class="stat-card">
-                    <div class="stat-label">🔍 Active Users</div>
-                    <div class="stat-value">${queries > 0 ? customers : 0}</div>
+                    <div class="stat-label">✅ Active Users</div>
+                    <div class="stat-value">${activeUsers}</div>
                     <div class="stat-detail">${activeRate}% of registered</div>
                 </div>
             `;
