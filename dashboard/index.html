@@ -410,6 +410,32 @@
     <script>
         const API_URL = 'https://far-rag-api-production.up.railway.app';
         
+        // Admin authentication
+        function getAdminKey() {
+            let key = sessionStorage.getItem('far_admin_key');
+            if (!key) {
+                key = prompt('Enter admin API key to access dashboard:');
+                if (key) {
+                    sessionStorage.setItem('far_admin_key', key);
+                }
+            }
+            return key;
+        }
+        
+        function fetchWithAuth(url, options = {}) {
+            const key = getAdminKey();
+            if (!key) {
+                throw new Error('Admin key required');
+            }
+            return fetch(url, {
+                ...options,
+                headers: {
+                    ...options.headers,
+                    'X-Admin-Key': key
+                }
+            });
+        }
+        
         let downloadChart = null;
 
         async function loadAllData() {
@@ -439,7 +465,7 @@
         async function loadPyPIStats() {
             try {
                 // Fetch funnel metrics (includes PyPI, registrations, active users)
-                const funnelResponse = await fetch(`${API_URL}/v1/funnel-metrics`);
+                const funnelResponse = await fetchWithAuth(`${API_URL}/v1/funnel-metrics`);
                 if (!funnelResponse.ok) throw new Error('Funnel metrics failed');
                 
                 const data = await funnelResponse.json();
@@ -520,7 +546,7 @@
 
         async function loadDailyDownloads() {
             try {
-                const response = await fetch(`${API_URL}/v1/pypi-stats/daily`);
+                const response = await fetchWithAuth(`${API_URL}/v1/pypi-stats/daily`);
                 if (!response.ok) throw new Error('Daily stats failed');
                 
                 const data = await response.json();
@@ -636,8 +662,8 @@
             try {
                 // Fetch both count and list to calculate active users
                 const [countResponse, listResponse] = await Promise.all([
-                    fetch(`${API_URL}/v1/customers/count`),
-                    fetch(`${API_URL}/v1/customers/list`)
+                    fetchWithAuth(`${API_URL}/v1/customers/count`),
+                    fetchWithAuth(`${API_URL}/v1/customers/list`)
                 ]);
                 
                 if (!countResponse.ok) throw new Error('Customer count failed');
@@ -786,7 +812,7 @@
 
         async function loadCustomers() {
             try {
-                const response = await fetch(`${API_URL}/v1/customers/list`);
+                const response = await fetchWithAuth(`${API_URL}/v1/customers/list`);
                 if (!response.ok) {
                     document.getElementById('customerTableBody').innerHTML = 
                         '<tr><td colspan="6" style="text-align: center; color: #888;">📊 Customer details endpoint deploying...</td></tr>';
@@ -807,7 +833,7 @@
 
         async function loadApiUsage() {
             try {
-                const response = await fetch(`${API_URL}/v1/usage/stats`);
+                const response = await fetchWithAuth(`${API_URL}/v1/usage/stats`);
                 if (!response.ok) {
                     // Endpoint not deployed yet - show placeholder with customer count
                     const customers = window.totalCustomers || 0;
